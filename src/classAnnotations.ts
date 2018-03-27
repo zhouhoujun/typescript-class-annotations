@@ -3,13 +3,13 @@ const through = require('through2');
 
 /**
  * attach class Annotations before typescript ts compile.
- * 
+ *
  * @export
- * @param {string} [annotationField='classAnnations'] 
- * @returns 
+ * @param {string} [annotationField='classAnnations']
+ * @returns
  */
-export function classAnnotations(annotationField='classAnnations') {
-    return  through.obj(function (file, encoding, callback) {
+export function classAnnotations(annotationField = 'classAnnations') {
+    return through.obj(function (file, encoding, callback) {
         if (file.isNull()) {
             return callback(null, file);
         }
@@ -19,7 +19,9 @@ export function classAnnotations(annotationField='classAnnations') {
         }
 
         let contents: string = file.contents.toString('utf8');
-        let sourceFile = ts.createSourceFile('cache.source.ts', contents, ts.ScriptTarget.Latest, /*setParentNodes */ true);
+        // fix typescript '$' bug when create source file.
+        contents = contents.replace(/\'\$\'/gi, '"$"');
+        let sourceFile = ts.createSourceFile('cache.source.ts', contents, ts.ScriptTarget.Latest, true);
         let eachChild = (node: ts.Node, annations?: any) => {
             if (ts.isClassDeclaration(node)) {
                 let className = node.name.text;
@@ -27,14 +29,14 @@ export function classAnnotations(annotationField='classAnnations') {
                     name: className,
                     params: {}
                 }
-                ts.forEachChild(node, (node) => eachChild(node, annations));
 
                 let oldclass = node.getText();
+                ts.forEachChild(node, (node) => eachChild(node, annations));
 
                 let classAnnations = `
                         static ${annotationField}:any  = ${JSON.stringify(annations)};
                    `;
-                let end = oldclass.lastIndexOf('}');
+                let end = oldclass.trimRight().length - 1;
                 contents = contents.replace(oldclass, oldclass.substring(0, end) + classAnnations + oldclass.substring(end));
 
             } else if (ts.isConstructorDeclaration(node)) {
